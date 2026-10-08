@@ -1,0 +1,42 @@
+# dependencies
+node_modules/
+
+# production build output and Vite cache
+dist/
+.vite/
+
+# local environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# logs and debug output
+*.log
+logs/
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+
+# test and coverage output
+coverage/
+.nyc_output/
+
+# editor settings
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
