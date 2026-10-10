@@ -19,6 +19,6 @@ async function submit () {
   if (loading.value) return
   const valid = await formRef.value.validate().catch(() => false); if (!valid) return
   loading.value = true
-  try { const response = await register(form); if (response?.code && response.code !== 200) throw new Error(response.msg || '注册失败'); ElMessage.success('账号创建成功，请登录'); await router.push('/login') } catch (error) { ElMessage.error(error.response?.data?.msg || error.message || '注册失败') } finally { loading.value = false }
+  try { const response = await register(form); if (response?.code && response.code !== 200) throw new Error(response.msg || '注册失败'); ElMessage.success('账号创建成功，请登录'); await router.push('/login') } catch (error) { const status = error.response?.status; const message = error.response?.data?.msg || (status === 404 ? '注册接口未部署，请检查后端版本' : status === 409 ? '用户名或邮箱已存在' : error.message || '注册失败'); ElMessage.error(message) } finally { loading.value = false }
 }
 </script>

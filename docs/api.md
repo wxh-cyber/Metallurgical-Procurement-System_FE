@@ -49,9 +49,9 @@ const res = await http.post('/auth/login', {
 localStorage.setItem('token', res.data.token)
 ```
 
-后端当前返回 `data.message` 占位信息，不包含 token；现有页面的 `stage-1-placeholder` 仅用于演示。真实接口接入后应保存 `data.token` 和 `data.user`，并将用户写入 Pinia。
+后端登录成功返回 `data.token`、`data.expiresIn` 和 `data.user`，前端保存 token 并将用户写入 Pinia；密码错误返回 401，停用账号返回 403。
 
-规划注册调用：`POST /auth/register`，提交 `username`、`email`、`password`；成功后回到登录页，不在前端保存密码。
+注册调用：`POST /auth/register`，提交 `username`、`email`、`password`；成功后回到登录页，不在前端保存密码。后端未部署或仍为旧版本时返回 404，页面会提示检查后端版本。
 
 ## 4. 页面与接口映射
 
@@ -103,4 +103,4 @@ localStorage.setItem('token', res.data.token)
 
 角色为 `ADMIN`、`PROCUREMENT`、`INSPECTOR`、`WAREHOUSE`。菜单和按钮最终应依据登录返回的 `user.role` 过滤；阶段 1 路由守卫只能判断 token 是否存在，不能视为权限控制。
 
-接入真实接口时应移除登录页的 `demoUser` 和固定 token 逻辑，保留表单校验、加载态、401 清理和登出状态清理。接口调用统一放在 `src/api/` 或对应页面的 API 模块中，不要在组件内重复创建 Axios 实例。
+注册和登录均已接入真实认证接口，不在前端保存密码。接口调用统一放在 `src/api/` 或对应页面的 API 模块中，不要在组件内重复创建 Axios 实例。
