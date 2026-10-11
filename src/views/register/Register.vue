@@ -19,6 +19,16 @@ async function submit () {
   if (loading.value) return
   const valid = await formRef.value.validate().catch(() => false); if (!valid) return
   loading.value = true
-  try { const response = await register(form); if (response?.code && response.code !== 200) throw new Error(response.msg || '注册失败'); ElMessage.success('账号创建成功，请登录'); await router.push('/login') } catch (error) { const status = error.response?.status; const message = error.response?.data?.msg || (status === 404 ? '注册接口未部署，请检查后端版本' : status === 409 ? '用户名或邮箱已存在' : error.message || '注册失败'); ElMessage.error(message) } finally { loading.value = false }
+  try {
+    const response = await register(form)
+    if (response?.code !== 200) throw new Error(response?.msg || '注册失败')
+    ElMessage.success('账号创建成功，请登录')
+    await router.push('/login')
+  } catch (error) {
+    const status = error.response?.status
+    const response = error.response?.data
+    const message = response?.msg || (status === 400 ? '注册信息不完整，请检查表单' : status === 404 ? '注册接口未部署，请检查后端版本' : status === 409 ? '用户名或邮箱已存在' : status === 503 ? '数据库暂不可用，请稍后重试' : status >= 500 ? '注册服务暂时不可用，请稍后重试' : error.message || '注册失败')
+    ElMessage.error(message)
+  } finally { loading.value = false }
 }
 </script>

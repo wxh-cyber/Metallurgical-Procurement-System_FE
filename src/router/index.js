@@ -6,6 +6,7 @@ const routes = [
   { path: '/register', component: () => import('../views/register/Register.vue') },
   { path: '/', component: MainLayout, redirect: '/dashboard', children: [
     { path: 'dashboard', component: () => import('../views/dashboard/Dashboard.vue') },
+    { path: 'account', component: () => import('../views/account/AccountCenter.vue'), meta: { title: '账户管理' } },
     { path: 'material', component: () => import('../views/Material.vue'), meta: { title: '物料档案' } },
     { path: 'supplier', component: () => import('../views/Supplier.vue'), meta: { title: '供应商管理' } },
     { path: 'purchase-plan', component: () => import('../views/Placeholder.vue'), meta: { title: '采购计划' } },
