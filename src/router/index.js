@@ -3,6 +3,7 @@ import MainLayout from '../layout/MainLayout.vue'
 
 const routes = [
   { path: '/login', component: () => import('../views/login/Login.vue') },
+  { path: '/register', component: () => import('../views/register/Register.vue') },
   {
     path: '/',
     component: MainLayout,
@@ -27,7 +28,7 @@ const router = createRouter({ history: createWebHistory(), routes })
 // 路由守卫：未登录跳登录页；已登录访问登录页跳仪表盘
 router.beforeEach((to) => {
   const hasToken = Boolean(localStorage.getItem('token'))
-  if (to.path === '/login') return hasToken ? '/dashboard' : true
+  if (to.path === '/login' || to.path === '/register') return hasToken ? '/dashboard' : true
   if (!hasToken) return '/login'
 })
 
