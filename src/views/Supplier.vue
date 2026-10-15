@@ -1,11 +1,42 @@
-<template><section><div class="page-head"><div><h2>供应商管理</h2><p>维护供应商信息与合作状态。</p></div><el-button type="primary" @click="openCreate">新增供应商</el-button></div><el-card><el-form inline @submit.prevent="load"><el-form-item><el-input v-model="query.keyword" placeholder="搜索供应商名称/编码" clearable /></el-form-item><el-button type="primary" @click="load">查询</el-button></el-form><el-table v-loading="loading" :data="rows" empty-text="暂无供应商数据"><el-table-column prop="supplierCode" label="供应商编码" /><el-table-column prop="supplierName" label="供应商名称" /><el-table-column prop="contactPerson" label="联系人" /><el-table-column prop="phone" label="联系电话" /><el-table-column prop="status" label="状态"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column><el-table-column label="操作"><template #default="{ row }"><el-button link type="primary" @click="openEdit(row)">编辑</el-button></template></el-table-column></el-table><el-pagination v-model:current-page="query.pageNum" v-model:page-size="query.pageSize" layout="total, prev, pager, next" :total="total" @current-change="load" /></el-card><el-dialog v-model="dialogVisible" :title="editing ? '编辑供应商' : '新增供应商'" width="480px"><el-form ref="formRef" :model="form" :rules="rules" label-width="90px"><el-form-item label="供应商编码" prop="supplierCode"><el-input v-model="form.supplierCode" /></el-form-item><el-form-item label="供应商名称" prop="supplierName"><el-input v-model="form.supplierName" /></el-form-item><el-form-item label="联系人"><el-input v-model="form.contactPerson" /></el-form-item><el-form-item label="联系电话"><el-input v-model="form.phone" /></el-form-item></el-form><template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template></el-dialog></section></template>
+<template>
+  <section class="management-page">
+    <header class="management-heading">
+      <div><span class="management-kicker">SUPPLIERS / PARTNERS</span><h1>供应商管理</h1><p>维护供应商信息与合作状态。</p></div>
+      <el-button class="create-button" type="primary" @click="openCreate">新增供应商</el-button>
+    </header>
+    <el-card class="management-card" shadow="never">
+      <el-form class="management-filters" inline @submit.prevent="load"><el-form-item><el-input v-model="query.keyword" placeholder="搜索供应商名称/编码" clearable /></el-form-item><el-button type="primary" @click="load">查询</el-button></el-form>
+      <el-table v-loading="loading" :data="rows" empty-text="暂无供应商数据"><el-table-column prop="supplierCode" label="供应商编码" /><el-table-column prop="supplierName" label="供应商名称" /><el-table-column prop="contactPerson" label="联系人" /><el-table-column prop="phone" label="联系电话" /><el-table-column prop="status" label="状态"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column><el-table-column label="操作" width="190" align="center"><template #default="{ row }"><div class="row-actions"><el-button class="row-action-button" size="small" type="primary" plain @click="openEdit(row)">编辑</el-button><el-button class="row-action-button" size="small" type="danger" plain @click="remove(row)">删除</el-button></div></template></el-table-column></el-table>
+      <el-pagination v-model:current-page="query.pageNum" v-model:page-size="query.pageSize" layout="total, prev, pager, next" :total="total" @current-change="load" />
+    </el-card>
+    <el-dialog v-model="dialogVisible" :title="editing ? '编辑供应商' : '新增供应商'" width="480px"><el-form ref="formRef" :model="form" :rules="rules" label-width="90px"><el-form-item label="供应商编码" prop="supplierCode"><el-input v-model="form.supplierCode" /></el-form-item><el-form-item label="供应商名称" prop="supplierName"><el-input v-model="form.supplierName" /></el-form-item><el-form-item label="联系人"><el-input v-model="form.contactPerson" /></el-form-item><el-form-item label="联系电话"><el-input v-model="form.phone" /></el-form-item></el-form><template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" :loading="saving" @click="save">保存</el-button></template></el-dialog>
+  </section>
+</template>
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { listSuppliers, createSupplier, updateSupplier } from '../api/suppliers'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { listSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../api/suppliers'
 const rows = ref([]); const total = ref(0); const loading = ref(false); const saving = ref(false); const dialogVisible = ref(false); const editing = ref(null); const formRef = ref(); const query = reactive({ pageNum: 1, pageSize: 10, keyword: '' }); const form = reactive({ supplierCode: '', supplierName: '', contactPerson: '', phone: '' }); const rules = { supplierCode: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }], supplierName: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }] }
 async function load () { loading.value = true; try { const res = await listSuppliers(query); rows.value = res.data?.records || []; total.value = res.data?.total || 0 } catch (e) { ElMessage.error(e.response?.data?.msg || '供应商加载失败') } finally { loading.value = false } }
-function openCreate () { editing.value = null; Object.assign(form, { supplierCode: '', supplierName: '', contactPerson: '', phone: '' }); dialogVisible.value = true }; function openEdit (row) { editing.value = row; Object.assign(form, row); dialogVisible.value = true }
-async function save () { const ok = await formRef.value.validate().catch(() => false); if (!ok) return; saving.value = true; try { editing.value ? await updateSupplier(editing.value.id, form) : await createSupplier(form); ElMessage.success('保存成功'); dialogVisible.value = false; load() } catch (e) { ElMessage.error(e.response?.data?.msg || '保存失败') } finally { saving.value = false } }
+function openCreate () { editing.value = null; Object.assign(form, { supplierCode: '', supplierName: '', contactPerson: '', phone: '' }); dialogVisible.value = true }
+function openEdit (row) { editing.value = row; Object.assign(form, row); dialogVisible.value = true }
+async function save () { const ok = await formRef.value.validate().catch(() => false); if (!ok) return; saving.value = true; try { editing.value ? await updateSupplier(editing.value.id, form) : await createSupplier(form); ElMessage.success('保存成功'); dialogVisible.value = false; await load() } catch (e) { ElMessage.error(e.response?.data?.msg || '保存失败') } finally { saving.value = false } }
+async function remove (row) { try { await ElMessageBox.confirm('确认删除该供应商？删除后不可恢复。', '提示', { type: 'warning' }); await deleteSupplier(row.id); ElMessage.success('删除成功'); if (rows.value.length === 1 && query.pageNum > 1) query.pageNum -= 1; await load() } catch (e) { if (e !== 'cancel' && e !== 'close') ElMessage.error(e.response?.data?.msg || '删除失败') } }
 onMounted(load)
 </script>
+
+<style scoped>
+.management-page { max-width: 1320px; margin: 0 auto; }
+.management-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 1px 0 22px; }
+.management-kicker { color: #a17b49; font-size: 9px; font-weight: 700; letter-spacing: .18em; }
+.management-heading h1 { margin: 7px 0 5px; color: #243848; font-size: 27px; letter-spacing: -.04em; }
+.management-heading p { margin: 0; color: #82909b; font-size: 13px; }
+.create-button { flex: 0 0 auto; min-height: 38px; padding: 0 17px; border-radius: 8px; }
+.management-card { border: 1px solid #e2e8e9; border-radius: 13px; background: rgba(255,255,255,.96); box-shadow: 0 7px 25px rgba(30,52,68,.035); }
+.management-card :deep(.el-card__body) { padding: 20px 22px; }
+.management-filters { margin-bottom: 4px; }
+.row-actions { display: flex; justify-content: center; gap: 7px; }
+.row-action-button { min-width: 52px; border-radius: 6px; }
+.management-card :deep(.el-pagination) { justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 560px) { .management-heading { align-items: flex-start; flex-direction: column; margin-bottom: 16px; } .create-button { align-self: flex-start; } .management-card :deep(.el-card__body) { padding: 15px 12px; } .row-actions { gap: 4px; } .row-action-button { min-width: 0; padding: 6px 8px; } }
+</style>

@@ -58,7 +58,15 @@ const allMenus = [
 ]
 const menus = computed(() => allMenus.filter(item => userStore.can(item.permission)))
 function goAccount () { router.push('/account') }
-async function logout () { await userStore.signOut(); router.push('/login') }
+async function logout () {
+  try {
+    await userStore.signOut()
+  } catch {
+    // 即使服务端退出失败，也必须结束本地会话。
+  } finally {
+    await router.replace('/login')
+  }
+}
 </script>
 
 <style scoped>

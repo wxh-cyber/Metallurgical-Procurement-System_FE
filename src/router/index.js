@@ -16,7 +16,8 @@ const routes = [
     { path: 'outbound', component: () => import('../views/Placeholder.vue'), meta: { title: '领用出库' } },
     { path: 'inventory', component: () => import('../views/Placeholder.vue'), meta: { title: '库存台账' } },
     { path: 'report', component: () => import('../views/Placeholder.vue'), meta: { title: '统计报表' } }
-  ]}
+  ]},
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ]
 const router = createRouter({ history: createWebHistory(), routes })
 router.beforeEach((to) => {

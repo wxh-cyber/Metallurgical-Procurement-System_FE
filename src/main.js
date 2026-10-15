@@ -10,4 +10,8 @@ const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia).use(router).use(ElementPlus)
 const userStore = useUserStore(pinia)
+window.addEventListener('auth-expired', () => {
+  userStore.clear()
+  if (router.currentRoute.value.path !== '/login') router.replace('/login')
+})
 userStore.restore().catch(() => {}).finally(() => app.mount('#app'))

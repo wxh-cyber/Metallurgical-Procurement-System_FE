@@ -9,6 +9,29 @@
       <div class="heading-meta"><span class="meta-label">统计周期</span><strong>{{ year }} 年度</strong><span class="meta-dates">{{ year }}.01.01 — {{ year }}.12.31</span></div>
     </header>
 
+    <section class="material-overview" aria-labelledby="material-overview-title">
+      <div class="overview-heading">
+        <div><span class="chart-kicker">MATERIALS / CATALOG</span><h2 id="material-overview-title">物料档案概览</h2><p>当前档案状态与类别分布</p></div>
+        <el-button class="overview-refresh" text :loading="materialsLoading" aria-label="刷新物料档案概览" @click="loadMaterialOverview"><el-icon><Refresh /></el-icon></el-button>
+      </div>
+      <div v-if="materialsLoading && !materialsLoaded" class="overview-state"><el-icon class="state-spinner"><Loading /></el-icon><span>正在读取物料档案…</span></div>
+      <div v-else-if="materialsError" class="overview-state overview-error"><span>{{ materialsError }}</span><el-button type="primary" link :loading="materialsLoading" @click="loadMaterialOverview">重新加载</el-button></div>
+      <div v-else-if="materialsLoaded && !materialTotal" class="overview-state">暂无物料档案</div>
+      <div v-else class="overview-content" :class="{ 'is-refreshing': materialsLoading }">
+        <div class="overview-metrics">
+          <article class="overview-metric total-metric"><span>物料总数</span><strong>{{ formatNumber(materialTotal) }}</strong><small>种档案物料</small></article>
+          <article class="overview-metric active-metric"><span>启用物料</span><strong>{{ formatNumber(activeMaterialCount) }}</strong><small>正常维护中</small></article>
+          <article class="overview-metric inactive-metric"><span>停用物料</span><strong>{{ formatNumber(inactiveMaterialCount) }}</strong><small>暂不参与业务</small></article>
+        </div>
+        <div class="category-summary">
+          <div class="category-summary-heading"><strong>类别分布</strong><span>{{ materialCategories.length }} 个类别</span></div>
+          <div class="category-list">
+            <div v-for="item in materialCategories" :key="item.name" class="category-row"><span class="category-name" :title="item.name">{{ item.name }}</span><span class="category-track"><i :style="{ width: (item.count / materialTotal * 100) + '%' }" /></span><strong>{{ item.count }}</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="report-strip">
       <div class="report-strip-mark"><el-icon><DataAnalysis /></el-icon></div>
       <div class="report-strip-copy"><strong>物料采购数量分析</strong><span>已按采购数量降序排列 · 悬停查看详细数据</span></div>
@@ -21,10 +44,12 @@
       <div class="state-icon error-icon"><el-icon><WarningFilled /></el-icon></div><strong>采购统计暂时不可用</strong><p>{{ errorMessage }}</p>
       <el-button type="primary" plain :loading="loading" @click="loadReport">重新加载</el-button>
     </div>
+    <div v-else-if="hasLoaded && materialsLoading && !materialsLoaded" class="state-card loading-state"><el-icon class="state-spinner"><Loading /></el-icon><span>正在将采购数据与物料档案匹配…</span></div>
     <div v-else-if="hasLoaded && !chartData.length" class="state-card empty-state">
       <div class="empty-orbit"><el-icon><PieChart /></el-icon></div><strong>本年度暂无采购数据</strong><p>当年度产生采购记录后，物料统计图表会显示在这里。</p>
     </div>
     <div v-else class="charts-grid" :class="{ 'is-refreshing': loading }">
+      <div v-if="materialsError" class="chart-source-warning"><el-icon><WarningFilled /></el-icon><span>物料档案暂不可用，图表仅显示有采购记录的物料。{{ materialsError }}</span><el-button type="primary" link :loading="materialsLoading" @click="loadMaterialOverview">重试</el-button></div>
       <el-card class="chart-card ranking-card" shadow="never">
         <div class="chart-card-heading"><div><span class="chart-kicker">QUANTITY / RANKING</span><h2>各物料采购数量</h2><p>横向比较各物料的年度采购总量</p></div><span class="chart-index">01</span></div>
         <div ref="barChartElement" class="chart-canvas bar-canvas" role="img" aria-label="各物料年度采购数量横向柱状图" />
@@ -32,10 +57,11 @@
       </el-card>
       <el-card class="chart-card composition-card" shadow="never">
         <div class="chart-card-heading"><div><span class="chart-kicker">COMPOSITION / SHARE</span><h2>采购数量构成</h2><p>各物料占年度采购总量的比例</p></div><span class="chart-index">02</span></div>
-        <div class="donut-wrap"><div ref="donutChartElement" class="chart-canvas donut-canvas" role="img" aria-label="各物料年度采购数量构成环形图" /><div class="donut-center" aria-hidden="true"><span>采购总量</span><strong>{{ formatCompactNumber(totalQuantity) }}</strong><small>{{ commonUnit || '数量' }}</small></div></div>
+        <div class="donut-wrap"><div ref="donutChartElement" class="chart-canvas donut-canvas" role="img" aria-label="各物料年度采购数量构成环形图" /><div v-if="!totalQuantity" class="donut-empty">暂无采购数量</div><div class="donut-center" aria-hidden="true"><span>采购总量</span><strong>{{ formatCompactNumber(totalQuantity) }}</strong><small>{{ commonUnit || '数量' }}</small></div></div>
         <div class="composition-legend" aria-label="物料数量图例">
-          <div v-for="item in chartData.slice(0, 6)" :key="item.key" class="legend-item"><span class="legend-dot" :style="{ background: item.color }" /><span class="legend-name" :title="item.name">{{ item.name }}</span><strong>{{ formatPercent(item.share) }}</strong></div>
-          <div v-if="chartData.length > 6" class="legend-more">另有 {{ chartData.length - 6 }} 种物料，可悬停环图查看</div>
+          <div v-for="item in positiveChartData.slice(0, 6)" :key="item.key" class="legend-item"><span class="legend-dot" :style="{ background: item.color }" /><span class="legend-name" :title="item.name">{{ item.name }}</span><strong>{{ formatPercent(item.share) }}</strong></div>
+          <div v-if="!positiveChartData.length" class="legend-more">本年度尚无物料发生采购</div>
+          <div v-else-if="positiveChartData.length > 6" class="legend-more">另有 {{ positiveChartData.length - 6 }} 种物料，可悬停环图查看</div>
         </div>
       </el-card>
     </div>
@@ -51,6 +77,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { ElMessage } from 'element-plus'
 import { DataAnalysis, Loading, PieChart, Refresh, WarningFilled } from '@element-plus/icons-vue'
+import { listMaterials } from '../../api/materials'
 import { getPurchaseReport } from '../../api/reports'
 
 echarts.use([BarChart, PieSeriesChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -62,11 +89,21 @@ const loading = ref(true)
 const hasLoaded = ref(false)
 const errorMessage = ref('')
 const chartData = ref([])
+const purchaseRows = ref([])
+const materialRows = ref([])
+const materialsLoading = ref(true)
+const materialsLoaded = ref(false)
+const materialsError = ref('')
+const materialTotal = ref(0)
+const activeMaterialCount = ref(0)
+const inactiveMaterialCount = ref(0)
+const materialCategories = ref([])
 let barChart
 let donutChart
 let resizeObserver
 let chartsLinked = false
 const totalQuantity = computed(() => chartData.value.reduce((sum, item) => sum + item.quantity, 0))
+const positiveChartData = computed(() => chartData.value.filter(item => item.quantity > 0))
 const commonUnit = computed(() => {
   const units = new Set(chartData.value.map(item => item.unit).filter(Boolean))
   return units.size === 1 ? [...units][0] : ''
@@ -83,14 +120,37 @@ function extractMaterialRows (response) {
 function normalizeRows (response) {
   const rows = extractMaterialRows(response)
   if (!rows) throw new Error('采购报表返回格式无法识别，请检查接口数据结构。')
-  const normalized = rows.map((row, index) => {
+  return rows.map((row, index) => {
     const quantity = Number(row?.quantity ?? row?.purchaseQuantity ?? row?.totalQuantity)
     const name = String(row?.materialName || row?.name || row?.materialCode || ('物料 ' + (index + 1)))
-    return { key: String(row?.materialId ?? row?.id ?? row?.materialCode ?? name), name, code: row?.materialCode || '', quantity, unit: row?.unit || '', color: palette[index % palette.length] }
+    return { key: String(row?.materialId ?? row?.id ?? row?.materialCode ?? name), materialId: row?.materialId ?? row?.id, name, code: row?.materialCode || '', quantity, unit: row?.unit || '' }
   }).filter(row => Number.isFinite(row.quantity) && row.quantity >= 0)
-  normalized.sort((a, b) => b.quantity - a.quantity)
-  const total = normalized.reduce((sum, row) => sum + row.quantity, 0)
-  return normalized.map(row => ({ ...row, share: total ? row.quantity / total : 0 }))
+}
+
+function mergeMaterialRows (purchases, materials) {
+  const merged = new Map()
+  const byCode = new Map()
+  materials.forEach((material, index) => {
+    const item = { key: String(material.id ?? material.materialCode ?? material.materialName ?? ('material-' + index)), materialId: material.id, name: String(material.materialName || material.materialCode || ('物料 ' + (index + 1))), code: material.materialCode || '', quantity: 0, unit: material.unit || '' }
+    if (material.id != null) merged.set(String(material.id), item)
+    if (material.materialCode) byCode.set(String(material.materialCode), item)
+  })
+  purchases.forEach(purchase => {
+    let item = purchase.materialId != null ? merged.get(String(purchase.materialId)) : null
+    if (!item && purchase.code) item = byCode.get(String(purchase.code))
+    if (!item) {
+      item = { ...purchase }
+      merged.set(item.key, item)
+      if (item.code) byCode.set(String(item.code), item)
+    } else {
+      item.quantity += purchase.quantity
+      item.unit = item.unit || purchase.unit
+    }
+  })
+  const rows = [...new Set([...merged.values(), ...byCode.values()])]
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name, 'zh-CN'))
+  const total = rows.reduce((sum, row) => sum + row.quantity, 0)
+  return rows.map((row, index) => ({ ...row, color: palette[index % palette.length], share: total ? row.quantity / total : 0 }))
 }
 
 function formatNumber (value) { return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value) }
@@ -118,16 +178,18 @@ function createBarOption () {
 function createDonutOption () {
   return {
     animationDuration: 850, animationDurationUpdate: 500, animationEasing: 'cubicOut',
-    tooltip: { trigger: 'item', confine: true, backgroundColor: 'transparent', borderWidth: 0, padding: 0, extraCssText: 'box-shadow:none', formatter: params => tooltipContent(chartData.value[params.dataIndex]) },
-    series: [{ type: 'pie', radius: ['59%', '78%'], center: ['50%', '50%'], avoidLabelOverlap: true, minAngle: 2, itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 5 }, label: { show: false }, labelLine: { show: false }, emphasis: { scale: true, scaleSize: 8, itemStyle: { shadowBlur: 16, shadowColor: 'rgba(35,55,70,.22)' } }, blur: { itemStyle: { opacity: 0.24 } }, data: chartData.value.map(item => ({ name: item.name, value: item.quantity, itemStyle: { color: item.color } })) }]
+    tooltip: { trigger: 'item', confine: true, backgroundColor: 'transparent', borderWidth: 0, padding: 0, extraCssText: 'box-shadow:none', formatter: params => tooltipContent(positiveChartData.value[params.dataIndex]) },
+    series: [{ type: 'pie', radius: ['59%', '78%'], center: ['50%', '50%'], avoidLabelOverlap: true, minAngle: 2, itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 5 }, label: { show: false }, labelLine: { show: false }, emphasis: { scale: true, scaleSize: 8, itemStyle: { shadowBlur: 16, shadowColor: 'rgba(35,55,70,.22)' } }, blur: { itemStyle: { opacity: 0.24 } }, data: positiveChartData.value.map(item => ({ name: item.name, value: item.quantity, itemStyle: { color: item.color } })) }]
   }
 }
 
-function linkHover (source, target) {
+function linkHover (source, target, sourceRows, targetRows) {
   source.on('mouseover', params => {
     source.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: params.dataIndex })
     target.dispatchAction({ type: 'downplay', seriesIndex: 0 })
-    target.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: params.dataIndex })
+    const row = sourceRows()[params.dataIndex]
+    const targetIndex = row && targetRows().findIndex(item => item.key === row.key)
+    if (targetIndex >= 0) target.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: targetIndex })
   })
   source.on('globalout', () => { source.dispatchAction({ type: 'downplay', seriesIndex: 0 }); target.dispatchAction({ type: 'downplay', seriesIndex: 0 }) })
 }
@@ -142,8 +204,8 @@ function initializeCharts () {
   if (!barChart && barChartElement.value) barChart = echarts.init(barChartElement.value)
   if (!donutChart && donutChartElement.value) donutChart = echarts.init(donutChartElement.value)
   if (barChart && donutChart && !chartsLinked) {
-    linkHover(barChart, donutChart)
-    linkHover(donutChart, barChart)
+    linkHover(barChart, donutChart, () => chartData.value, () => positiveChartData.value)
+    linkHover(donutChart, barChart, () => positiveChartData.value, () => chartData.value)
     chartsLinked = true
   }
   if (typeof ResizeObserver !== 'undefined' && !resizeObserver) {
@@ -169,15 +231,16 @@ async function loadReport () {
   errorMessage.value = ''
   try {
     const response = await getPurchaseReport({ year })
-    chartData.value = normalizeRows(response)
+    purchaseRows.value = normalizeRows(response)
     hasLoaded.value = true
   } catch (error) {
     errorMessage.value = error.response?.data?.msg || error.message || '加载采购统计失败，请稍后重试。'
-    chartData.value = []
+    purchaseRows.value = []
     hasLoaded.value = true
     ElMessage.error('采购统计加载失败')
   } finally {
     loading.value = false
+    chartData.value = materialsError.value ? purchaseRows.value : mergeMaterialRows(purchaseRows.value, materialRows.value)
     await nextTick()
     if (chartData.value.length) {
       initializeCharts()
@@ -186,7 +249,55 @@ async function loadReport () {
   }
 }
 
-onMounted(loadReport)
+async function loadMaterialOverview () {
+  materialsLoading.value = true
+  materialsError.value = ''
+  try {
+    const pageSize = 10
+    let pageNum = 1
+    let total = 0
+    const rows = []
+    do {
+      const response = await listMaterials({ pageNum, pageSize })
+      const payload = response?.data
+      if (!Array.isArray(payload?.records)) throw new Error('物料档案返回格式无法识别。')
+      if (pageNum === 1) total = Number(payload.total) || 0
+      rows.push(...payload.records)
+      pageNum += 1
+      if (!payload.records.length) break
+    } while (rows.length < total)
+
+    const categoryCounts = new Map()
+    let active = 0
+    rows.forEach(row => {
+      if (row.status === 1) active += 1
+      const category = String(row.category || '').trim() || '未分类'
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1)
+    })
+    materialTotal.value = total
+    materialRows.value = rows
+    activeMaterialCount.value = active
+    inactiveMaterialCount.value = Math.max(total - active, 0)
+    materialCategories.value = [...categoryCounts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'))
+    materialsLoaded.value = true
+  } catch (error) {
+    materialRows.value = []
+    materialsError.value = error.response?.data?.msg || error.message || '物料档案加载失败，请稍后重试。'
+    materialsLoaded.value = true
+  } finally {
+    materialsLoading.value = false
+    if (hasLoaded.value) {
+      chartData.value = materialsError.value ? purchaseRows.value : mergeMaterialRows(purchaseRows.value, materialRows.value)
+      await nextTick()
+      if (chartData.value.length) {
+        initializeCharts()
+        renderCharts()
+      } else disposeCharts()
+    }
+  }
+}
+
+onMounted(() => { loadReport(); loadMaterialOverview() })
 function resizeCharts () { barChart?.resize(); donutChart?.resize() }
 onBeforeUnmount(disposeCharts)
 </script>
@@ -211,6 +322,33 @@ onBeforeUnmount(disposeCharts)
 .meta-label { color: #96a3a9; font-size: 10px; }
 .heading-meta strong { color: #425969; font-size: 12px; }
 .meta-dates { grid-column: 1 / -1; margin-top: 4px; color: #a4afb4; font-size: 9px; letter-spacing: .08em; }
+.material-overview { margin-bottom: 19px; padding: 19px 21px 20px; border: 1px solid #e2e8e9; border-radius: 13px; background: linear-gradient(110deg,rgba(255,255,255,.96),rgba(251,250,247,.92)); box-shadow: 0 7px 25px rgba(30,52,68,.03); }
+.overview-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 15px; }
+.overview-heading h2 { margin: 5px 0 3px; color: #2d4353; font-size: 15px; }
+.overview-heading p { margin: 0; color: #9aa6ac; font-size: 10px; }
+.overview-refresh { width: 30px; height: 30px; color: #8999a2; }
+.overview-refresh:hover { color: #a77a3f; background: #f8f2e8; }
+.overview-content { display: grid; grid-template-columns: minmax(360px,1.05fr) minmax(260px,.95fr); gap: 22px; transition: opacity 180ms ease; }
+.overview-content.is-refreshing { opacity: .58; pointer-events: none; }
+.overview-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.overview-metric { display: flex; min-width: 0; flex-direction: column; padding: 12px 13px 10px; border: 1px solid #e9edec; border-radius: 9px; background: rgba(255,255,255,.72); }
+.overview-metric span { color: #91a0a6; font-size: 10px; }
+.overview-metric strong { margin: 5px 0 1px; color: #304758; font-family: Georgia,serif; font-size: 23px; font-weight: 600; letter-spacing: -.03em; }
+.overview-metric small { color: #a5afb3; font-size: 9px; }
+.active-metric strong { color: #66836c; }
+.inactive-metric strong { color: #b17965; }
+.category-summary { min-width: 0; padding-left: 20px; border-left: 1px solid #e9edec; }
+.category-summary-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+.category-summary-heading strong { color: #536978; font-size: 10px; }
+.category-summary-heading span { color: #a3adb1; font-size: 9px; }
+.category-list { display: grid; max-height: 116px; gap: 8px; overflow-y: auto; padding-right: 3px; }
+.category-row { display: grid; grid-template-columns: minmax(65px,.7fr) minmax(50px,1fr) 28px; align-items: center; gap: 9px; color: #82929a; font-size: 9px; }
+.category-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.category-track { height: 5px; overflow: hidden; border-radius: 4px; background: #edf0ee; }
+.category-track i { display: block; height: 100%; min-width: 3px; border-radius: inherit; background: linear-gradient(90deg,#c58a43,#d6b47f); }
+.category-row strong { color: #546a76; font-size: 9px; font-weight: 600; text-align: right; }
+.overview-state { display: flex; min-height: 74px; align-items: center; justify-content: center; gap: 10px; color: #929fa5; font-size: 10px; }
+.overview-error { flex-wrap: wrap; color: #b96553; }
 .report-strip { display: flex; align-items: center; gap: 13px; margin-bottom: 19px; padding: 14px 18px; border: 1px solid #e4e9e9; border-radius: 12px; background: linear-gradient(100deg,#fff 0%,#fbfaf7 100%); box-shadow: 0 5px 17px rgba(30,52,68,.025); }
 .report-strip-mark { display: grid; flex: 0 0 38px; place-items: center; width: 38px; height: 38px; border: 1px solid #efe4d3; border-radius: 11px; color: #aa8049; background: #fbf6ec; font-size: 17px; }
 .report-strip-copy { display: flex; flex: 1; flex-direction: column; gap: 4px; }
@@ -223,6 +361,8 @@ onBeforeUnmount(disposeCharts)
 .refresh-button { width: 31px; height: 31px; margin-left: 3px; color: #8999a2; }
 .refresh-button:hover { color: #a77a3f; background: #f8f2e8; }
 .charts-grid { display: grid; grid-template-columns: minmax(0,1.42fr) minmax(330px,.88fr); gap: 19px; transition: opacity 220ms ease; }
+.chart-source-warning { display: flex; grid-column: 1 / -1; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid #f0e2cb; border-radius: 9px; color: #9a7444; background: #fbf6ec; font-size: 10px; }
+.chart-source-warning span { flex: 1; min-width: 0; }
 .charts-grid.is-refreshing { opacity: .64; pointer-events: none; }
 .chart-card { min-width: 0; min-height: 440px; border: 1px solid #e2e8e9; border-radius: 13px; background: rgba(255,255,255,.94); box-shadow: 0 7px 25px rgba(30,52,68,.035); }
 .chart-card :deep(.el-card__body) { height: 100%; box-sizing: border-box; padding: 22px 23px 17px; }
@@ -239,6 +379,7 @@ onBeforeUnmount(disposeCharts)
 .composition-card :deep(.el-card__body) { display: flex; flex-direction: column; }
 .donut-wrap { position: relative; width: min(100%,270px); height: 250px; margin: 4px auto 0; }
 .donut-canvas { height: 100%; }
+.donut-empty { position: absolute; top: 50%; left: 50%; color: #9aa6ab; font-size: 10px; transform: translate(-50%,-50%); pointer-events: none; }
 .donut-center { position: absolute; top: 50%; left: 50%; display: flex; align-items: center; flex-direction: column; gap: 2px; transform: translate(-50%,-50%); pointer-events: none; }
 .donut-center span { color: #9aa6ab; font-size: 9px; }
 .donut-center strong { color: #304758; font-family: Georgia,serif; font-size: 24px; font-weight: 600; letter-spacing: -.04em; }
@@ -262,6 +403,6 @@ onBeforeUnmount(disposeCharts)
 .footer-year { margin-left: auto; color: #aab4b8; font-size: 8px; letter-spacing: .16em; }
 @keyframes dashboard-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 980px) { .charts-grid { grid-template-columns: 1fr; } .chart-card { min-height: 400px; } .composition-card { min-height: 440px; } }
-@media (max-width: 560px) { .dashboard-heading { align-items: flex-start; flex-direction: column; gap: 15px; } .report-strip { gap: 9px; padding: 12px; } .report-strip-total { padding-left: 10px; } .report-strip-total strong { font-size: 16px; } .report-strip-copy span { max-width: 150px; line-height: 1.5; } .chart-card :deep(.el-card__body) { padding: 19px 15px 15px; } .bar-canvas { height: 300px; } .donut-wrap { height: 230px; } .composition-legend { gap: 9px; } }
+@media (max-width: 980px) { .charts-grid { grid-template-columns: 1fr; } .chart-card { min-height: 400px; } .composition-card { min-height: 440px; } .overview-content { grid-template-columns: 1fr; gap: 16px; } .category-summary { padding: 14px 0 0; border-top: 1px solid #e9edec; border-left: 0; } }
+@media (max-width: 560px) { .dashboard-heading { align-items: flex-start; flex-direction: column; gap: 15px; } .material-overview { padding: 16px 14px; } .overview-metrics { gap: 6px; } .overview-metric { padding: 10px 8px; } .overview-metric strong { font-size: 20px; } .report-strip { gap: 9px; padding: 12px; } .report-strip-total { padding-left: 10px; } .report-strip-total strong { font-size: 16px; } .report-strip-copy span { max-width: 150px; line-height: 1.5; } .chart-card :deep(.el-card__body) { padding: 19px 15px 15px; } .bar-canvas { height: 300px; } .donut-wrap { height: 230px; } .composition-legend { gap: 9px; } }
 </style>

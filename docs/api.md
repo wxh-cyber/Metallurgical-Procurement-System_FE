@@ -1,8 +1,8 @@
 # 冶金企业原材料采购管理系统前端接口调用文档
 
-> 版本：阶段 1 接口契约草案｜更新：2026-10-08
+> 版本：前后端联调说明
 
-本文档面向 Vue 3 页面开发，接口契约与 `backend/docs/api.md` 保持一致。当前只有登录接口在后端实现，其余页面和接口均为规划中。
+本文档面向 Vue 3 页面开发，接口契约与同级后端仓库 `../backend/docs/api.md` 保持一致。账号注册、登录、会话查询、物料/供应商管理和采购报表接口已实现；其他业务接口仍为规划中。
 
 ## 1. 请求基础
 
@@ -19,7 +19,7 @@ const response = await http.get('/materials', {
 
 - Axios `baseURL` 为 `/api`，因此调用路径不要重复写 `/api`。
 - 请求默认超时 10 秒；请求拦截器自动读取 `localStorage.token` 并添加 `Authorization: Bearer <token>`。
-- 收到 `401` 时清理本地 token，页面应跳转 `/login` 并提示重新登录。
+- 收到 `401` 时清理本地 token 并跳转 `/login`；登录页会展示后端返回的认证错误。
 - 成功判断：`response.code === 200`；失败优先展示 `response.msg`。
 - 列表统一传 `pageNum`（从 1 开始）、`pageSize`（建议不超过 100），读取 `data.records`、`data.total`、`data.pages`。
 
@@ -51,7 +51,7 @@ localStorage.setItem('token', res.data.token)
 
 后端登录成功返回 `data.token`、`data.expiresIn` 和 `data.user`，前端保存 token 并将用户写入 Pinia；密码错误返回 401，停用账号返回 403。
 
-注册调用：`POST /auth/register`，提交 `username`、`email`、`password`；成功后回到登录页，不在前端保存密码。后端未部署或仍为旧版本时返回 404，页面会提示检查后端版本。
+注册调用：`POST /auth/register`，提交 `username`、`email`、`password`；成功后回到登录页，不在前端保存密码。重复用户名或邮箱返回 HTTP 409 并显示对应提示；数据库连接或初始化脚本问题返回 HTTP 503。
 
 ## 4. 页面与接口映射
 
@@ -103,4 +103,4 @@ localStorage.setItem('token', res.data.token)
 
 角色为 `ADMIN`、`PROCUREMENT`、`INSPECTOR`、`WAREHOUSE`。菜单和按钮最终应依据登录返回的 `user.role` 过滤；阶段 1 路由守卫只能判断 token 是否存在，不能视为权限控制。
 
-注册和登录均已接入真实认证接口，不在前端保存密码。接口调用统一放在 `src/api/` 或对应页面的 API 模块中，不要在组件内重复创建 Axios 实例。
+注册和登录均已接入真实认证接口，不在前端保存密码。开发联调先启动后端，并确保 MySQL 已执行 `schema.sql` 与 `data.sql`；数据库凭据通过后端进程环境变量设置，具体步骤见后端 README。接口调用统一放在 `src/api/` 或对应页面的 API 模块中，不要在组件内重复创建 Axios 实例。
