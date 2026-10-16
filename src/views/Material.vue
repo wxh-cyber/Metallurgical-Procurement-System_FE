@@ -6,8 +6,8 @@
     </header>
     <el-card class="management-card" shadow="never">
       <el-alert v-if="purchaseError" class="purchase-alert" :title="purchaseError" type="warning" :closable="false" show-icon />
-      <el-form class="management-filters" inline @submit.prevent="load"><el-form-item><el-input v-model="query.keyword" placeholder="搜索物料名称/编码" clearable /></el-form-item><el-button type="primary" @click="load">查询</el-button></el-form>
-      <el-table v-loading="loading" :data="rows" empty-text="暂无物料数据"><el-table-column prop="materialCode" label="物料编码" /><el-table-column prop="materialName" label="物料名称" /><el-table-column prop="category" label="类别" /><el-table-column prop="unit" label="单位" /><el-table-column label="本年度采购数量" min-width="150"><template #default="{ row }">{{ purchaseLoaded ? formatPurchaseQuantity(row) : '暂不可用' }}</template></el-table-column><el-table-column prop="status" label="状态"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column><el-table-column label="操作" width="190" align="center"><template #default="{ row }"><div class="row-actions"><el-button class="row-action-button" size="small" type="primary" plain @click="openEdit(row)">编辑</el-button><el-button class="row-action-button" size="small" type="danger" plain @click="remove(row)">删除</el-button></div></template></el-table-column></el-table>
+      <el-form class="management-filters" inline @submit.prevent="load"><el-form-item><el-input v-model="query.keyword" placeholder="搜索物料名称/编码" clearable /></el-form-item><el-button class="search-button" type="primary" @click="load"><el-icon><Search /></el-icon><span>查询</span></el-button></el-form>
+      <el-table v-loading="loading" :data="rows" empty-text="暂无物料数据"><el-table-column prop="materialCode" label="物料编码" /><el-table-column prop="materialName" label="物料名称" /><el-table-column prop="category" label="类别" /><el-table-column prop="unit" label="单位" /><el-table-column label="本年度采购数量" min-width="150"><template #default="{ row }">{{ purchaseLoaded ? formatPurchaseQuantity(row) : '暂不可用' }}</template></el-table-column><el-table-column prop="status" label="状态"><template #default="{ row }"><el-tag class="status-tag" :class="row.status === 1 ? 'status-enabled' : 'status-disabled'" effect="light">{{ row.status === 1 ? '启用' : '停用' }}</el-tag></template></el-table-column><el-table-column label="操作" width="190" align="center"><template #default="{ row }"><div class="row-actions"><el-button class="row-action-button" size="small" type="primary" plain @click="openEdit(row)">编辑</el-button><el-button class="row-action-button" size="small" type="danger" plain @click="remove(row)">删除</el-button></div></template></el-table-column></el-table>
       <el-pagination v-model:current-page="query.pageNum" v-model:page-size="query.pageSize" layout="total, prev, pager, next" :total="total" @current-change="load" />
     </el-card>
     <el-dialog v-model="dialogVisible" class="material-dialog" width="560px" :close-on-click-modal="false" @closed="resetFormValidation">
@@ -20,7 +20,7 @@
           <el-form-item label="物料编码" prop="materialCode"><el-input v-model="form.materialCode" placeholder="请输入唯一物料编码" /></el-form-item>
           <el-form-item label="物料名称" prop="materialName"><el-input v-model="form.materialName" placeholder="请输入物料名称" /></el-form-item>
           <el-form-item label="类别"><el-input v-model="form.category" placeholder="例如：矿石、辅料" /></el-form-item>
-          <el-form-item label="计量单位"><el-input v-model="form.unit" placeholder="例如：吨、千克" /></el-form-item>
+          <el-form-item label="计量单位"><el-input v-model="form.unit" placeholder="例如：吨、千克" /></el-form-item><el-form-item label="状态" prop="status"><el-select v-model="form.status" class="status-select" placeholder="请选择状态"><el-option :value="1" label="启用" /><el-option :value="0" label="停用" /></el-select></el-form-item>
         </div>
         <div class="quantity-section">
           <div class="form-section-heading"><span class="section-index quantity-index">02</span><div><strong>采购数量</strong><p>本年度数量，可在后续采购中继续调整</p></div></div>
@@ -37,18 +37,19 @@
 <script setup>
 import { reactive, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import { listMaterials, createMaterial, updateMaterial, deleteMaterial } from '../api/materials'
 import { getPurchaseReport } from '../api/reports'
 import { buildPurchaseQuantityIndex, createMaterialPayload, getPurchaseQuantity, normalizePurchaseQuantity } from '../utils/materialQuantity'
-const rows = ref([]); const total = ref(0); const loading = ref(false); const saving = ref(false); const dialogVisible = ref(false); const editing = ref(null); const formRef = ref(); const query = reactive({ pageNum: 1, pageSize: 10, keyword: '' }); const form = reactive({ materialCode: '', materialName: '', category: '', unit: '', purchaseQuantity: 0 }); const rules = { materialCode: [{ required: true, message: '请输入物料编码', trigger: 'blur' }], materialName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }], purchaseQuantity: [{ validator: (rule, value, callback) => { try { normalizePurchaseQuantity(value); callback() } catch (error) { callback(error) } }, trigger: ['blur', 'change'] }] }
+const rows = ref([]); const total = ref(0); const loading = ref(false); const saving = ref(false); const dialogVisible = ref(false); const editing = ref(null); const formRef = ref(); const query = reactive({ pageNum: 1, pageSize: 10, keyword: '' }); const form = reactive({ materialCode: '', materialName: '', category: '', unit: '', purchaseQuantity: 0, status: 1 }); const rules = { materialCode: [{ required: true, message: '请输入物料编码', trigger: 'blur' }], materialName: [{ required: true, message: '请输入物料名称', trigger: 'blur' }], purchaseQuantity: [{ validator: (rule, value, callback) => { try { normalizePurchaseQuantity(value); callback() } catch (error) { callback(error) } }, trigger: ['blur', 'change'] }], status: [{ required: true, message: '请选择物料状态', trigger: 'change' }] }
 const purchaseLoading = ref(false); const purchaseLoaded = ref(false); const purchaseError = ref(''); const purchaseQuantities = ref({}); const currentYear = new Date().getFullYear(); let purchaseRefreshTimer
 async function load () { loading.value = true; try { const res = await listMaterials(query); rows.value = res.data?.records || []; total.value = res.data?.total || 0 } catch (e) { ElMessage.error(e.response?.data?.msg || '物料加载失败') } finally { loading.value = false } }
 function extractPurchaseRows (response) { const payload = response?.data ?? response; if (Array.isArray(payload)) return payload; const candidates = [payload?.byMaterial, payload?.materials, payload?.records, payload?.items, response?.byMaterial]; return candidates.find(Array.isArray) || null }
 function normalizePurchaseQuantities (response) { const reportRows = extractPurchaseRows(response); if (!reportRows) throw new Error('采购报表返回格式无法识别。'); return buildPurchaseQuantityIndex(reportRows) }
 function formatPurchaseQuantity (row) { const quantity = getPurchaseQuantity(row, purchaseQuantities.value); return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(quantity) + (row.unit ? ' ' + row.unit : '') }
 async function loadPurchaseQuantities () { purchaseLoading.value = true; try { const response = await getPurchaseReport({ year: currentYear }); purchaseQuantities.value = normalizePurchaseQuantities(response); purchaseLoaded.value = true; purchaseError.value = '' } catch (error) { purchaseError.value = error.response?.data?.msg || error.message || '采购数量刷新失败，暂时保留上次成功数据。' } finally { purchaseLoading.value = false } }
-async function openCreate () { editing.value = null; Object.assign(form, { materialCode: '', materialName: '', category: '', unit: '', purchaseQuantity: 0 }); dialogVisible.value = true; await nextTick(); formRef.value?.clearValidate() }
-async function openEdit (row) { editing.value = row; Object.assign(form, { materialCode: row.materialCode || '', materialName: row.materialName || '', category: row.category || '', unit: row.unit || '', purchaseQuantity: normalizePurchaseQuantity(row.purchaseQuantity ?? getPurchaseQuantity(row, purchaseQuantities.value)) }); dialogVisible.value = true; await nextTick(); formRef.value?.clearValidate() }
+async function openCreate () { editing.value = null; Object.assign(form, { materialCode: '', materialName: '', category: '', unit: '', purchaseQuantity: 0, status: 1 }); dialogVisible.value = true; await nextTick(); formRef.value?.clearValidate() }
+async function openEdit (row) { editing.value = row; Object.assign(form, { materialCode: row.materialCode || '', materialName: row.materialName || '', category: row.category || '', unit: row.unit || '', purchaseQuantity: normalizePurchaseQuantity(row.purchaseQuantity ?? getPurchaseQuantity(row, purchaseQuantities.value)), status: row.status === 0 ? 0 : 1 }); dialogVisible.value = true; await nextTick(); formRef.value?.clearValidate() }
 function resetFormValidation () { formRef.value?.clearValidate() }
 async function save () { const ok = await formRef.value.validate().catch(() => false); if (!ok) return; saving.value = true; try { const payload = createMaterialPayload(form); editing.value ? await updateMaterial(editing.value.id, payload) : await createMaterial(payload); ElMessage.success('保存成功'); dialogVisible.value = false; await Promise.all([load(), loadPurchaseQuantities()]) } catch (e) { ElMessage.error(e.response?.data?.msg || e.message || '保存失败') } finally { saving.value = false } }
 async function remove (row) { try { await ElMessageBox.confirm('确认删除该物料？删除后不可恢复。', '提示', { type: 'warning' }); await deleteMaterial(row.id); ElMessage.success('删除成功'); if (rows.value.length === 1 && query.pageNum > 1) query.pageNum -= 1; await load() } catch (e) { if (e !== 'cancel' && e !== 'close') ElMessage.error(e.response?.data?.msg || '删除失败') } }
@@ -68,6 +69,13 @@ onUnmounted(() => { if (purchaseRefreshTimer) window.clearInterval(purchaseRefre
 .management-card { border: 1px solid #e2e8e9; border-radius: 13px; background: rgba(255,255,255,.96); box-shadow: 0 7px 25px rgba(30,52,68,.035); }
 .management-card :deep(.el-card__body) { padding: 20px 22px; }
 .management-filters { margin-bottom: 4px; }
+.management-filters :deep(.el-form-item) { margin-right: 10px; margin-bottom: 0; }
+.management-filters :deep(.el-input) { width: 330px; }
+.search-button { min-height: 38px; padding: 0 16px; border-radius: 8px; gap: 6px; box-shadow: 0 5px 12px rgba(52,79,89,.13); }
+.search-button:hover { transform: translateY(-1px); box-shadow: 0 7px 15px rgba(52,79,89,.18); }
+.status-tag { min-width: 48px; border: 0; border-radius: 999px; font-weight: 650; text-align: center; }
+.status-enabled { color: #247453; background: #e5f4ec; }
+.status-disabled { color: #7b8587; background: #edf0ef; }
 .row-actions { display: flex; justify-content: center; gap: 7px; }
 .row-action-button { min-width: 52px; border-radius: 6px; }
 .management-card :deep(.el-pagination) { justify-content: flex-end; margin-top: 16px; }
@@ -80,6 +88,8 @@ onUnmounted(() => { if (purchaseRefreshTimer) window.clearInterval(purchaseRefre
 .material-form :deep(.el-input__wrapper) { min-height: 39px; border-radius: 7px; box-shadow: 0 0 0 1px #dfe5e5 inset; transition: box-shadow .18s ease, background-color .18s ease; }
 .material-form :deep(.el-input__wrapper:hover) { box-shadow: 0 0 0 1px #b8c5c5 inset; }
 .material-form :deep(.el-input__wrapper.is-focus) { box-shadow: 0 0 0 1px #b17d43 inset, 0 0 0 3px rgba(177,125,67,.1); }
+.material-form :deep(.el-select__wrapper) { min-height: 39px; border-radius: 7px; box-shadow: 0 0 0 1px #dfe5e5 inset; }
+.status-select { width: 100%; }
 .form-section-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 17px; }
 .section-index { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 1px solid #eadcc8; border-radius: 8px; background: #f7f1e8; color: #a17b49; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
 .form-section-heading strong { color: #314552; font-size: 13px; }

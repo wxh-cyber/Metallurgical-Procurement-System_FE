@@ -34,6 +34,7 @@ export function createMaterialPayload (form) {
     materialName: form.materialName,
     category: form.category,
     unit: form.unit,
-    purchaseQuantity: normalizePurchaseQuantity(form.purchaseQuantity)
+    purchaseQuantity: normalizePurchaseQuantity(form.purchaseQuantity),
+    status: form.status === 0 ? 0 : 1
   }
 }
